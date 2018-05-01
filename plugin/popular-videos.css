@@ -1,0 +1,17 @@
+/* override player styles */
+video {
+  position: relative;
+  top: 0;
+  left: 0;
+}
+/* override playlist styles */
+.vjs-mouse.vjs-playlist {
+  font-size: 1rem;
+  position: absolute;
+  top: 64px;
+  left: 516px;
+  width: 250px;
+  min-width: 200px;
+  max-width: 270px;
+  max-height: 293px;
+}

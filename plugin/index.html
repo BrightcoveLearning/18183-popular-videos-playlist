@@ -3,13 +3,32 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Untitled Document</title>
+  <title>Popular Videos Playlist</title>
+  <link href="related-videos-cms.css" rel="stylesheet">
 </head>
 
 <body>
+  <!-- player embed code with an added id attribute -->
+  <video id="myPlayerID"
+    data-playlist-id="4593481849001"
+    data-account="1752604059001"
+    data-player="Hyuo8j4pM"
+    data-embed="default"
+    data-application-id
+    class="video-js"
+    controls
+    width="500"
+    height="281"></video>
+  <script src="//players.brightcove.net/1752604059001/Hyuo8j4pM_default/index.min.js"></script>
 
+  <!-- Element added to specify the location of the playlist -->
+  <div class="vjs-playlist"></div>
 
+  <!-- custom script -->
+  <script type="text/javascript" src="popular-videos.js"></script>
+  <script>
+    videojs('myPlayerID').popularVideos();
+  </script>
 
 </body>
-
 </html>
