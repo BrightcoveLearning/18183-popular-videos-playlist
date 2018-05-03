@@ -1,13 +1,106 @@
 videojs.registerPlugin('popularVideos', function() {
     var myPlayer = this,
-        reportURL = 'https://analytics.api.brightcove.com/v1/data',
-        proxyURL = 'https://solutions.brightcove.com/bcls/bcls-proxy/doc-samples-proxy.php',
-        apiRequest = document.getElementById('apiRequest'),
-        responseData = document.getElementById('responseData'),
-        // this var needs to be in the function scope because multiple functions will access it
-        videoData = {};
-    // launch the controller function to kick things off
-    init();
+      apiRequest = document.getElementById('apiRequest'),
+      responseData = document.getElementById('responseData'),
+      videoIds = [],
+      videoData = {},
+      JSONanalyticsData = {};
+    // create an array holder for the videos
+    videoData.videos = [];
+
+    // Build options needed for Analytics API request
+    var options = {},
+      baseURL = "https://analytics.api.brightcove.com/v1/data";
+    options.proxyURL = "https://solutions.brightcove.com/bcls/bcls-proxy/brightcove-learning-proxy-v2.php";
+    options.requestType = "GET";
+
+    // set up data for Analytics API request
+    setRequestData();
+    // make the Analytics API request
+    makeRequest(options, function(analyticsData) {
+      // Convert response string into JSON
+      JSONanalyticsData = JSON.parse(analyticsData);
+      responseData.textContent = JSON.stringify(JSONanalyticsData, null, '  ');
+      console.log("JSONanalyticsData",JSONanalyticsData);
+      // extract the video ids into an array
+      videoIds = extractVideoIds(JSONanalyticsData);
+      // use the catalog to get the video data
+      getVideoData(videoIds, function() {
+        // add the popular videos list to the player as a playlist
+        console.log(videoData.videos)
+        myPlayer.playlist(videoData.videos);
+      });
+    });
+
+    // +++ Set up Analytics API request +++
+    /**
+     * sets up the data for the API request
+     */
+    function setRequestData() {
+      var endPoint = '',
+        // get the epoch time in milliseconds 24 hours ago
+        // 12 hours in milliseconds = 1000 * 24 * 60 * 60 = 86,400,000
+        yesterday = new Date().valueOf() - 86400000,
+      // note that we don't have to set the to date to now because that's the default
+      endPoint = '?accounts=1752604059001&dimensions=video&sort=-video_view&limit=6&from=' + yesterday;
+      options.url = baseURL + endPoint;
+      apiRequest.textContent = options.url;
+    }
+
+    // +++ Make the Analytics API request +++
+    /**
+    * send API request to the proxy
+    * @param  {Object} options for the request
+    * @param  {String} options.url the full API request URL
+    * @param  {String="GET","POST","PATCH","PUT","DELETE"} requestData [options.requestType="GET"] HTTP type for the request
+    * @param  {String} options.proxyURL proxyURL to send the request to
+    * @param  {String} options.client_id client id for the account (default is in the proxy)
+    * @param  {String} options.client_secret client secret for the account (default is in the proxy)
+    * @param  {JSON} [options.requestBody] Data to be sent in the request body in the form of a JSON string
+    * @param  {Function} [callback] callback function that will process the response
+    */
+    function makeRequest(options, callback) {
+      var httpRequest = new XMLHttpRequest(),
+          response,
+          requestParams,
+          dataString,
+          proxyURL = options.proxyURL,
+          // response handler
+          getResponse = function() {
+            try {
+              if (httpRequest.readyState === 4) {
+                if (httpRequest.status >= 200 && httpRequest.status < 300) {
+                  response = httpRequest.responseText;
+                  // some API requests return '{null}' for empty responses - breaks JSON.parse
+                  if (response === "{null}") {
+                    response = null;
+                  }
+                  // return the response
+                  callback(response);
+                } else {
+                  alert(
+                    "There was a problem with the request. Request returned " +
+                    httpRequest.status
+                  );
+                }
+              }
+            } catch (e) {
+              alert("Caught Exception: " + e);
+            }
+          };
+       /**
+        * set up request data
+        * the proxy used here takes the following request body:
+        * JSON.strinify(options)
+        */
+      // set response handler
+      httpRequest.onreadystatechange = getResponse;
+      // open the request
+      httpRequest.open("POST", proxyURL);
+      // set headers if there is a set header line, remove it
+      // open and send request
+      httpRequest.send(JSON.stringify(options));
+    }
 
     // +++ Extract the video ids +++
     /**
@@ -61,89 +154,5 @@ videojs.registerPlugin('popularVideos', function() {
         i++;
         getVideo();
       }
-    }
-
-    // +++ Set up Analytics API request +++
-    /**
-    * sets up the data for the API request
-    */
-    function setRequestData() {
-      var endPoint = '',
-          // get the epoch time in milliseconds 24 hours ago
-          // 12 hours in milliseconds = 1000 * 24 * 60 * 60 = 86,400,000
-          yesterday = new Date().valueOf() - 86400000,
-          requestData = {};
-      // note that we don't have to set the to date to now because that's the default
-      endPoint = '?accounts=1752604059001&dimensions=video&sort=-video_view&limit=6&from=' + yesterday;
-      requestData.url = reportURL + endPoint;
-      requestData.requestType = 'GET';
-      apiRequest.textContent = requestData.url;
-      return requestData;
-    }
-
-    // +++ Get data from Analytics API +++
-    /**
-    * send API request to the proxy
-    * @param  {object} requestData options for the request
-    * @param  {string} requestID the type of request = id of the button
-    * @return {object} parsedData the parsed API response
-    */
-    function getAnalyticsData(options, callback) {
-      var httpRequest = new XMLHttpRequest(),
-          responseRaw,
-          parsedData,
-          requestParams;
-      // set up request data
-      requestParams = 'url=' + encodeURIComponent(options.url) + '&requestType=' + options.requestType;
-      // set response handler
-      httpRequest.onreadystatechange = getResponse;
-      // open the request
-      httpRequest.open('POST', proxyURL);
-      // set headers
-      httpRequest.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-      // open and send request
-      httpRequest.send(requestParams);
-      // response handler
-      function getResponse() {
-        try {
-          if (httpRequest.readyState === 4) {
-            if (httpRequest.status === 200) {
-              responseRaw = httpRequest.responseText;
-              responseData.textContent = responseRaw;
-              parsedData = JSON.parse(responseRaw);
-              responseData.textContent = JSON.stringify(parsedData, null, '  ');
-              callback(parsedData);
-            } else {
-              alert('There was a problem with the request. Request returned ' + httpRequest.status);
-            }
-          }
-        } catch (e) {
-          alert('Caught Exception: ' + e);
-        }
-      }
-    }
-
-    /**
-    * acts as a controller for the rest of the script
-    */
-    function init() {
-      var requestData = {},
-          videoIds = [];
-      // create an array holder for the videos
-      videoData.videos = [];
-      // set up data for Analytics API request
-      requestData = setRequestData();
-      // make the Analytics API request
-      getAnalyticsData(requestData, function(analyticsData) {
-        // extract the video ids into an array
-        videoIds = extractVideoIds(analyticsData);
-        // use the catalog to get the video data
-        getVideoData(videoIds, function() {
-          // add the popular videos list to the player as a playlist
-          //console.log(videoData.videos)
-          // +++ Load the playlist +++
-          myPlayer.playlist(videoData.videos);
-        });
-      });
     }
 });
